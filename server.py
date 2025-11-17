@@ -5,8 +5,16 @@ from mcp.server import Server
 import re
 import mcp.types as types
 from mcp.types import TextContent, Completion
+import logging
 
 load_dotenv()
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("polymcp.server")
 
 POLY_API = os.getenv("POLYGON_API_KEY")
 BASE_URL = os.getenv("POLYGON_BASE_URL", "https://api.polygon.io")
@@ -42,16 +50,23 @@ async def math_op(tool_name: str, arguments: dict):
     op = arguments.get("operation")
     a = arguments.get("a")
     b = arguments.get("b")
+    
+    logger.info(f"🧮 Math operation requested: {op} with a={a}, b={b}")
 
     if op == "mul":
         res = a * b
+        logger.info(f"✅ Multiply result: {a} × {b} = {res}")
     elif op == "div":
         if b == 0:
+            logger.error("❌ Division by zero attempted!")
             raise ValueError("division by zero")
         res = a / b
+        logger.info(f"✅ Divide result: {a} ÷ {b} = {res}")
     else:
+        logger.error(f"❌ Unsupported operation: {op}")
         raise ValueError(f"unsupported operation: {op}")
 
+    logger.info(f"🎯 Math operation completed successfully: {res}")
     return {"result": res}
 
 # polygon helper
@@ -70,20 +85,27 @@ def polygon_get(path: str, params: dict = None):
 
 
 @server.call_tool()
-def get_price(symbol: str):
+def get_price(ticker: str):
+    """Get current price for ticker"""
+    logger.info(f"📈 Price request for ticker: {ticker}")
+    
+    url = f"{BASE_URL}/v2/aggs/ticker/{ticker}/prev"
+    params = {"adjusted": "true", "apikey": POLY_API}
+    
     try:
-        try:
-            data = polygon_get(f"v1/last/crypto/{symbol}")
-            return TextContent(type="text", text=str(data))
-        except:
-            pass
-
-        # Fallback to prev close
-        data = polygon_get(f"v2/aggs/ticker/{symbol}/prev")
-        return TextContent(type="text", text=str(data))
-
+        logger.info(f"🌐 Making API call to Polygon.io for {ticker}")
+        r = requests.get(url, params=params)
+        response_data = r.json()
+        
+        # Extract price info for logging
+        if 'results' in response_data and response_data['results']:
+            close_price = response_data['results'][0].get('c', 'N/A')
+            logger.info(f"✅ Price retrieved for {ticker}: ${close_price}")
+        
+        return TextContent(type="text", text=str(response_data))
     except Exception as e:
-        return TextContent(type="text", text=f"Error: {e}")
+        logger.error(f"❌ Error getting price for {ticker}: {e}")
+        return TextContent(type="text", text=f"error: {e}")
 
 
 @server.call_tool()
@@ -145,6 +167,32 @@ def _call_liara_chat(user_content: str) -> str:
             return data["choices"][0]["text"]
         except Exception:
             raise RuntimeError(f"Unexpected LLM response shape: {data}")
+
+
+# Define the _call_openwebui function
+def _call_openwebui(prompt: str) -> str:
+    """Call OpenWebUI-compatible endpoint and return text."""
+    OPENWEBUI_URL = os.getenv("OPENWEBUI_URL")
+    OPENWEBUI_API_KEY = os.getenv("OPENWEBUI_API_KEY")
+
+    if not OPENWEBUI_URL:
+        raise RuntimeError("OPENWEBUI_URL not configured")
+
+    headers = {"Content-Type": "application/json"}
+    if OPENWEBUI_API_KEY:
+        headers["Authorization"] = f"Bearer {OPENWEBUI_API_KEY}"
+
+    payload = {"prompt": prompt, "max_new_tokens": 512}
+    endpoints = ["/api/v1/generate", "/api/generate"]
+    for ep in endpoints:
+        url = OPENWEBUI_URL.rstrip("/") + ep
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response.raise_for_status()
+            return response.json().get("text", "")
+        except Exception as e:
+            continue
+    raise RuntimeError("Failed to get a response from OpenWebUI")
 
 
 # MCP completion handler
@@ -214,6 +262,10 @@ def provide_completion(ref, argument, context):
         return Completion(values=[completion_text], total=1, hasMore=False)
     except Exception:
         return None
+
+
+
+
 
 if __name__ == "__main__":
     # Run an stdio-backed MCP server using anyio. This matches the installed

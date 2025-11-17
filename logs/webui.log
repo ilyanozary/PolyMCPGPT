@@ -1,0 +1,9 @@
+2025-11-15 18:28:26,591 INFO Prompt received: ضرب 6 و 7
+2025-11-15 18:28:26,592 INFO Calling math_op for multiply 6.0 * 7.0
+2025-11-15 18:28:26,592 INFO math_op result: {'result': 42.0}
+2025-11-16 12:43:23,880 INFO Prompt received: معنای زندگی چیست؟
+2025-11-16 12:43:23,881 INFO Forwarding prompt to OpenWebUI: http://127.0.0.1:3000
+2025-11-16 12:43:24,574 INFO OpenWebUI returned: None
+2025-11-16 12:43:48,327 INFO Prompt received: معنای زندگی چیست؟
+2025-11-16 12:43:48,327 INFO Forwarding prompt to OpenWebUI: http://127.0.0.1:3000
+2025-11-16 12:43:48,355 INFO OpenWebUI returned: None
