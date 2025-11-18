@@ -1,6 +1,31 @@
+version: '3.9'
+
 services:
-  mcp:
-    build: .
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
     ports:
-      - "8000:8000"
-      - "8501:8501"
+      - "8080:8080"
+    volumes:
+      - openwebui_data:/app/backend/data
+    environment:
+      - ENABLE_MCP=true
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434  # اگر Ollama داری
+      # - WEBUI_SECRET_KEY=supersecret  # اختیاری برای امنیت
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  polymcp:
+    build: .
+    container_name: polymcp-complete
+    env_file:
+      - .env
+    depends_on:
+      - openwebui
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  openwebui_data:

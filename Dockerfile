@@ -1,18 +1,31 @@
-# Use an official Python runtime as a parent image
-FROM python:3.10-slim
+# Dockerfile — حرفه‌ای، چندمنظوره، بهینه
+FROM python:3.11-slim
 
-# Set the working directory in the container
+# جلوگیری از بافر و لاگ‌گیری بهتر
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
 WORKDIR /app
 
-# Copy the current directory contents into the container
-COPY . /app
+# نصب supervisor برای ران کردن چند پروسه
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install any needed packages specified in requirements.txt
+# کپی و نصب وابستگی‌ها اول (بهترین کش داکر)
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Make ports available to the world outside this container
-EXPOSE 8000
-EXPOSE 8501
+# کپی همه فایل‌های پروژه
+COPY . .
 
-# Run Streamlit app
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# کپی کانفیگ supervisor
+COPY supervisord.conf /etc/supervisord.conf
+
+# پورت‌های مورد نیاز
+EXPOSE 8501   
+# Streamlit
+# MCP از stdio استفاده می‌کنه → پورت لازم نداره
+
+# ران کردن supervisor (همه چیز با هم بالا میاد)
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
